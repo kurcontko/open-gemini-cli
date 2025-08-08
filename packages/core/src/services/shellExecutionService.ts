@@ -6,10 +6,10 @@
 
 import { spawn } from 'child_process';
 import { TextDecoder } from 'util';
-import os from 'os';
 import stripAnsi from 'strip-ansi';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import { isBinary } from '../utils/textUtils.js';
+import { getShellConfiguration, isWindows } from '../utils/shell-utils.js';
 
 const SIGKILL_TIMEOUT_MS = 200;
 
@@ -88,17 +88,21 @@ export class ShellExecutionService {
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
   ): ShellExecutionHandle {
-    const isWindows = os.platform() === 'win32';
+    // Determine the shell configuration (executable and required arguments)
+    const { executable, argsPrefix } = getShellConfiguration();
 
-    const child = spawn(commandToExecute, [], {
+    // Construct the arguments array for spawn. The command string itself
+    // is passed as the final argument (e.g., bash -c "command string").
+    const spawnArgs = [...argsPrefix, commandToExecute];
+
+    const child = spawn(executable, spawnArgs, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
-      // Use bash unless in Windows (since it doesn't support bash).
-      // For windows, just use the default.
-      shell: isWindows ? true : 'bash',
+      // Explicitly false for security. We are manually invoking the shell.
+      shell: false,
       // Use process groups on non-Windows for robust killing.
       // Windows process termination is handled by `taskkill /t`.
-      detached: !isWindows,
+      detached: !isWindows, // Uses the imported constant
       env: {
         ...process.env,
         GEMINI_CLI: '1',
