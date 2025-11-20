@@ -650,10 +650,9 @@ export class Task {
         break;
       case GeminiEventType.Error:
       default: {
-        // Block scope for lexical declaration
-        const errorEvent = event as ServerGeminiErrorEvent; // Type assertion
+        const errorEvent = event as ServerGeminiErrorEvent;
         const errorMessage =
-          errorEvent.value?.error.message ?? 'Unknown error from LLM stream';
+          errorEvent?.value?.error?.message ?? 'Unknown error from LLM stream';
         logger.error(
           '[Task] Received error event from LLM stream:',
           errorMessage,
@@ -667,7 +666,8 @@ export class Task {
         this.setTaskStateAndPublishUpdate(
           this.taskState,
           stateChange,
-          `Agent Error, unknown agent message: ${errorMessage}`,
+          undefined, // no messageText -> no Message in the event
+          //`Agent Error, unknown agent message: ${errorMessage}`, // 👈 this becomes user-visible text
           undefined,
           false,
           errMessage,
