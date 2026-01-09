@@ -51,10 +51,12 @@ export async function loadConfig(
     coreTools: settings.coreTools || undefined,
     excludeTools: settings.excludeTools || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
+    // A2A server defaults to YOLO mode since there's no interactive UI for approvals.
+    // Can be overridden by setting GEMINI_YOLO_MODE=false explicitly.
     approvalMode:
-      process.env['GEMINI_YOLO_MODE'] === 'true'
-        ? ApprovalMode.YOLO
-        : ApprovalMode.DEFAULT,
+      process.env['GEMINI_YOLO_MODE'] === 'false'
+        ? ApprovalMode.DEFAULT
+        : ApprovalMode.YOLO,
     mcpServers: settings.mcpServers,
     cwd: workspaceDir,
     telemetry: {

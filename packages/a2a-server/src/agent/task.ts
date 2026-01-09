@@ -383,7 +383,17 @@ export class Task {
       }
 
       // Only send an update if the status has actually changed.
-      if (hasChanged) {
+      // When auto-executing, skip intermediate status events (validating, scheduled,
+      // executing, awaiting_approval) to reduce noise for the calling agent.
+      // Only publish terminal states (success, error, cancelled).
+      const shouldAutoApprove =
+        this.autoExecute || this.config.getApprovalMode() === ApprovalMode.YOLO;
+      const isTerminalStatus = ['success', 'error', 'cancelled'].includes(
+        tc.status,
+      );
+      const skipIntermediateEvent = shouldAutoApprove && !isTerminalStatus;
+
+      if (hasChanged && !skipIntermediateEvent) {
         const coderAgentMessage: CoderAgentMessage =
           tc.status === 'awaiting_approval'
             ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }

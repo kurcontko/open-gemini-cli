@@ -141,10 +141,6 @@ export class CoderAgentExecutor implements AgentExecutor {
     eventBus?: ExecutionEventBus,
   ): Promise<TaskWrapper> {
     const agentSettings = agentSettingsInput || ({} as AgentSettings);
-    // Default autoExecute to true when running as A2A server (no interactive UI)
-    if (agentSettings.autoExecute === undefined) {
-      agentSettings.autoExecute = true;
-    }
     const config = await this.getConfig(agentSettings, taskId);
     const runtimeTask = await Task.create(
       taskId,
