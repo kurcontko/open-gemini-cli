@@ -6,9 +6,15 @@
 
 import { isDevelopment } from '../utils/installationInfo.js';
 import type { ICommandLoader } from './types.js';
-import type { SlashCommand } from '../ui/commands/types.js';
-import type { Config } from '@google/gemini-cli-core';
+import {
+  CommandKind,
+  type SlashCommand,
+  type CommandContext,
+} from '../ui/commands/types.js';
+import type { MessageActionReturn, Config } from '@google/gemini-cli-core';
+import { startupProfiler } from '@google/gemini-cli-core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
+import { agentsCommand } from '../ui/commands/agentsCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { chatCommand } from '../ui/commands/chatCommand.js';
@@ -21,6 +27,7 @@ import { directoryCommand } from '../ui/commands/directoryCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
+import { hooksCommand } from '../ui/commands/hooksCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
 import { initCommand } from '../ui/commands/initCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
@@ -32,9 +39,11 @@ import { policiesCommand } from '../ui/commands/policiesCommand.js';
 import { profileCommand } from '../ui/commands/profileCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
+import { resumeCommand } from '../ui/commands/resumeCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
+import { skillsCommand } from '../ui/commands/skillsCommand.js';
 import { settingsCommand } from '../ui/commands/settingsCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
@@ -55,8 +64,10 @@ export class BuiltinCommandLoader implements ICommandLoader {
    * @returns A promise that resolves to an array of `SlashCommand` objects.
    */
   async loadCommands(_signal: AbortSignal): Promise<SlashCommand[]> {
+    const handle = startupProfiler.start('load_builtin_commands');
     const allDefinitions: Array<SlashCommand | null> = [
       aboutCommand,
+      ...(this.config?.isAgentsEnabled() ? [agentsCommand] : []),
       authCommand,
       bugCommand,
       chatCommand,
@@ -67,30 +78,66 @@ export class BuiltinCommandLoader implements ICommandLoader {
       docsCommand,
       directoryCommand,
       editorCommand,
-      extensionsCommand(this.config?.getEnableExtensionReloading()),
+      ...(this.config?.getExtensionsEnabled() === false
+        ? [
+            {
+              name: 'extensions',
+              description: 'Manage extensions',
+              kind: CommandKind.BUILT_IN,
+              autoExecute: false,
+              subCommands: [],
+              action: async (
+                _context: CommandContext,
+              ): Promise<MessageActionReturn> => ({
+                type: 'message',
+                messageType: 'error',
+                content: 'Extensions are disabled by your admin.',
+              }),
+            },
+          ]
+        : [extensionsCommand(this.config?.getEnableExtensionReloading())]),
       helpCommand,
+      ...(this.config?.getEnableHooksUI() ? [hooksCommand] : []),
       await ideCommand(),
       initCommand,
-      mcpCommand,
+      ...(this.config?.getMcpEnabled() === false
+        ? [
+            {
+              name: 'mcp',
+              description:
+                'Manage configured Model Context Protocol (MCP) servers',
+              kind: CommandKind.BUILT_IN,
+              autoExecute: false,
+              subCommands: [],
+              action: async (
+                _context: CommandContext,
+              ): Promise<MessageActionReturn> => ({
+                type: 'message',
+                messageType: 'error',
+                content: 'MCP is disabled by your admin.',
+              }),
+            },
+          ]
+        : [mcpCommand]),
       memoryCommand,
-      ...(this.config?.getUseModelRouter() ? [modelCommand] : []),
+      modelCommand,
       ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
       privacyCommand,
-      ...(this.config?.getEnableMessageBusIntegration()
-        ? [policiesCommand]
-        : []),
+      policiesCommand,
       ...(isDevelopment ? [profileCommand] : []),
       quitCommand,
       restoreCommand(this.config),
+      resumeCommand,
       statsCommand,
       themeCommand,
       toolsCommand,
+      ...(this.config?.isSkillsSupportEnabled() ? [skillsCommand] : []),
       settingsCommand,
       vimCommand,
       setupGithubCommand,
       terminalSetupCommand,
     ];
-
+    handle?.end();
     return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);
   }
 }
