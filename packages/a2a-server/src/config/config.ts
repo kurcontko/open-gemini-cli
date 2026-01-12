@@ -23,6 +23,7 @@ import {
   startupProfiler,
   PREVIEW_GEMINI_MODEL,
   homedir,
+  createPolicyEngineConfig,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -36,6 +37,21 @@ export async function loadConfig(
 ): Promise<Config> {
   const workspaceDir = process.cwd();
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
+
+  // A2A server defaults to YOLO mode since there's no interactive UI for approvals.
+  // Can be overridden by setting GEMINI_YOLO_MODE=false explicitly.
+  const approvalMode =
+    process.env['GEMINI_YOLO_MODE'] === 'false'
+      ? ApprovalMode.DEFAULT
+      : ApprovalMode.YOLO;
+
+  // Load policy engine config with TOML rules for the approval mode
+  const policyEngineConfig = await createPolicyEngineConfig(
+    settings,
+    approvalMode,
+  );
+  // A2A server is non-interactive (no UI to approve tools)
+  policyEngineConfig.nonInteractive = true;
 
   const configParams: ConfigParameters = {
     sessionId: taskId,
@@ -51,12 +67,8 @@ export async function loadConfig(
     coreTools: settings.coreTools || undefined,
     excludeTools: settings.excludeTools || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
-    // A2A server defaults to YOLO mode since there's no interactive UI for approvals.
-    // Can be overridden by setting GEMINI_YOLO_MODE=false explicitly.
-    approvalMode:
-      process.env['GEMINI_YOLO_MODE'] === 'false'
-        ? ApprovalMode.DEFAULT
-        : ApprovalMode.YOLO,
+    approvalMode,
+    policyEngineConfig,
     mcpServers: settings.mcpServers,
     cwd: workspaceDir,
     telemetry: {
