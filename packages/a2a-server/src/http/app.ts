@@ -195,13 +195,15 @@ export async function createApp() {
     );
 
     let expressApp = express();
+    // Configure JSON body parser with higher limit before A2A routes
+    // Default express limit is 100kb, increase to 50mb for large payloads
+    expressApp.use(express.json({ limit: '50mb' }));
     expressApp.use((req, res, next) => {
       requestStorage.run({ req }, next);
     });
 
     const appBuilder = new A2AExpressApp(requestHandler);
     expressApp = appBuilder.setupRoutes(expressApp, '');
-    expressApp.use(express.json());
 
     expressApp.post('/tasks', async (req, res) => {
       try {
