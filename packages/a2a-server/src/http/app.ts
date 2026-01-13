@@ -195,9 +195,32 @@ export async function createApp() {
     );
 
     let expressApp = express();
-    // Configure JSON body parser with higher limit before A2A routes
-    // Default express limit is 100kb, increase to 50mb for large payloads
-    expressApp.use(express.json({ limit: '50mb' }));
+
+    // Workaround for A2A SDK's hardcoded 100kb body limit:
+    // Parse JSON with higher limit BEFORE SDK routes, and save raw body
+    // so the SDK's internal body-parser can re-read it
+    expressApp.use(
+      express.json({
+        limit: '50mb',
+        verify: (req: express.Request, _res, buf) => {
+          // Save raw body buffer so SDK's body-parser can re-read it
+          (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+        },
+      }),
+    );
+
+    // Middleware to make the stream "re-readable" for SDK's body-parser
+    expressApp.use((req, _res, next) => {
+      const rawBody = (req as express.Request & { rawBody?: Buffer }).rawBody;
+      if (rawBody && req.body) {
+        // Mark body as not yet parsed so SDK's parser processes req.body
+        // But since stream is consumed, we need to skip SDK's parser
+        // by setting _body flag that body-parser checks
+        (req as express.Request & { _body?: boolean })._body = true;
+      }
+      next();
+    });
+
     expressApp.use((req, res, next) => {
       requestStorage.run({ req }, next);
     });
